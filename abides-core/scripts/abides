@@ -1,0 +1,128 @@
+#! /bin/python3
+
+import datetime as dt
+import importlib
+import inspect
+import logging
+import os
+import sys
+from typing import Callable, Dict, List, Optional, Tuple, Union
+
+import coloredlogs
+import numpy as np
+from termcolor import colored
+
+from abides_core.kernel import Kernel
+from abides_core.utils import subdict
+
+
+logger = logging.getLogger("abides")
+
+
+def load_build_config_function(config_file: str) -> Tuple[str, Callable]:
+    if not os.path.exists(config_file):
+        print(colored(f"Config file '{config_file}' does not exist!\n", "red"))
+        sys.exit()
+
+    module_name = config_file[:-3].split("/")[-1]
+
+    spec = importlib.util.spec_from_file_location(module_name, config_file)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    if not hasattr(module, "build_config"):
+        print(colored("'build_config' method not found in config file.\n", "red"))
+        sys.exit()
+
+    if not hasattr(module.build_config, "__call__"):
+        print(colored("'build_config' is not a callable function.\n", "red"))
+        sys.exit()
+
+    return (module_name, module.build_config)
+
+
+def parse_args(args: List[str]) -> Optional[Dict[str, Union[str, bool]]]:
+    parsed_values = {}
+    key = None
+    for arg in args:
+        if arg.startswith("--"):
+            key = arg[2:]
+            parsed_values[key] = True
+        elif key is not None:
+            parsed_values[key] = arg
+            key = None
+        else:
+            print(colored(f"Error parsing argument: '{arg}'\n", "red"))
+            return
+
+    return parsed_values
+
+
+def main():
+    print()
+    print("╔═══════════════════════════════════════════════════════════╗")
+    print("║ ABIDES: Agent-Based Interactive Discrete Event Simulation ║")
+    print("╚═══════════════════════════════════════════════════════════╝")
+    print()
+
+    if len(sys.argv) < 2:
+        print(colored("Config file not given!", "red"))
+        return
+
+    cli_args = parse_args(sys.argv[2:])
+
+    if cli_args is None:
+        return
+
+    config_name, config_builder = load_build_config_function(sys.argv[1])
+
+    if config_builder is None:
+        return
+
+    config_args = inspect.getfullargspec(config_builder).args
+
+    for arg in cli_args:
+        if arg not in config_args:
+            print(
+                colored(
+                    f"Provided argument '{arg}' is not a parameter for the '{config_name}'' config_builder function!\n",
+                    "red",
+                )
+            )
+
+    config = config_builder(**cli_args)
+
+    coloredlogs.install(
+        level=config["stdout_log_level"],
+        fmt="[%(process)d] %(levelname)s %(name)s %(message)s",
+    )
+
+
+    kernel = Kernel(
+        random_state=np.random.RandomState(seed=1),
+        log_dir="",
+        **subdict(
+            config,
+            [
+                "start_time",
+                "stop_time",
+                "agents",
+                "agent_latency_model",
+                "default_computation_delay",
+                "custom_properties",
+            ],
+        ),
+    )
+
+    sim_start_time = dt.datetime.now()
+    logger.info(f"Simulation Start Time: {sim_start_time}")
+
+    kernel.run()
+
+    sim_end_time = dt.datetime.now()
+    logger.info(f"Simulation End Time: {sim_end_time}")
+    logger.info(f"Time taken to run simulation: {sim_end_time - sim_start_time}")
+
+
+if __name__ == "__main__":
+    main()
