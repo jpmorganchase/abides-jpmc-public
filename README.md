@@ -175,7 +175,6 @@ TODO: add information about JPMC contribution agreement
 
 <!-- LICENSE -->
 ## License
-**TODO**: need to be checked
 Distributed under the BSD 3-Clause "New" or "Revised" License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
