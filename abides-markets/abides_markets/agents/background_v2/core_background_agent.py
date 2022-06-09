@@ -1,12 +1,13 @@
 from collections import deque
 from copy import deepcopy
 from typing import Any, Deque, Dict, List, Optional, Tuple
+from matplotlib.pyplot import isinteractive
 
 import numpy as np
 
 from abides_core import Message, NanosecondTime
 from abides_core.generators import ConstantTimeGenerator, InterArrivalTimeGenerator
-from abides_core.utils import str_to_ns
+from abides_core.utils import fmt_ts, str_to_ns
 from abides_markets.agents.trading_agent import TradingAgent
 from abides_markets.messages.marketdata import (
     MarketDataMsg,
@@ -18,8 +19,12 @@ from abides_markets.messages.marketdata import (
     L2SubReqMsg,
     TransactedVolSubReqMsg,
 )
+from abides_markets.messages.orderbook import (
+    OrderAcceptedMsg, 
+    OrderExecutedMsg
+)
+from abides_markets.messages.marl import OrderMatchedWithWhomMsg, OrderMatchedValueAgentMsg
 from abides_markets.orders import Order, Side
-
 
 class CoreBackgroundAgent(TradingAgent):
     def __init__(
@@ -42,6 +47,11 @@ class CoreBackgroundAgent(TradingAgent):
         name: Optional[str] = None,
         type: Optional[str] = None,
         random_state: Optional[np.random.RandomState] = None,
+        num_noise_agents: int = None, 
+        num_value_agents: int = None, 
+        num_momentum_agents: int = None,
+        max_iter: int = None,
+        num_pts: int = 1,
     ) -> None:
         super().__init__(
             id,
@@ -102,11 +112,20 @@ class CoreBackgroundAgent(TradingAgent):
         # - keys = order_id
         # - value = dictionary {'active'|'cancelled'|'executed', Order, 'active_qty','executed_qty', 'cancelled_qty }
         self.order_status: Dict[int, Dict[str, Any]] = {}
+        self.num_noise_agents = num_noise_agents
+        self.num_value_agents = num_value_agents
+        self.num_momentum_agents = num_momentum_agents
+        self.num_pts = num_pts
+        self.max_iter = max_iter
+        self.matching_agents = np.zeros(4+self.num_pts,dtype=int) 
+        # number of orders matched by 0: Noise agent, 1: Value agent, 2: Momentum agent, 3: MM, 4,..: PT
+        self.matched_value_agent_orders = np.zeros((2,self.max_iter)) 
+        #0,t: price at which order was executed within tth interval; 1,t: side \in [0,2]
 
     def kernel_starting(self, start_time: NanosecondTime) -> None:
         super().kernel_starting(start_time)
 
-    def wakeup(self, current_time: NanosecondTime) -> bool:
+    def wakeup(self, current_time: NanosecondTime, act_on_wakeup_flag = False) -> bool:
         # TODO: parent class (TradingAgent) returns bool of "ready to trade"
         """Agent interarrival wake up times are determined by wakeup_interval_generator"""
         super().wakeup(current_time)
@@ -128,12 +147,13 @@ class CoreBackgroundAgent(TradingAgent):
 
             self.has_subscribed = True
         # compute the following wake up
-        if (self.mkt_open != None) and (
-            current_time >= self.mkt_open
-        ):  # compute the state (returned to the Gym Env)
-            raw_state = self.act_on_wakeup()
-            # TODO: wakeup function should return bool
-            return raw_state
+        if act_on_wakeup_flag:
+            if (self.mkt_open != None) and (
+                current_time >= self.mkt_open
+            ):  # compute the state (returned to the Gym Env)
+                raw_state = self.act_on_wakeup()
+                # TODO: wakeup function should return bool
+                return raw_state
 
     ##return non None value so the kernel catches it and stops
     # return raw_state
@@ -152,6 +172,8 @@ class CoreBackgroundAgent(TradingAgent):
         :type message: str
         :return:
         """
+        # if self.id == 114 and isinstance(message, OrderExecutedMsg):
+        #     print('MM received msg from kernel at: ',message,fmt_ts(current_time),sender_id)
         # TODO: will prob need to see for transacted volume if we enrich the state
         super().receive_message(current_time, sender_id, message)
         if self.subscribe:
@@ -162,6 +184,34 @@ class CoreBackgroundAgent(TradingAgent):
                 elif isinstance(message, TransactedVolDataMsg):
                     self.parsed_volume_data = self.get_parsed_volume_data(message)
                     self.parsed_volume_data_buffer.append(self.parsed_volume_data)
+        if isinstance(message, OrderMatchedWithWhomMsg):
+            # print(f'{self.id} received matching msg {message}')
+            if 1 <= message.matching_agent_id <= self.num_noise_agents: #Matched by Noise Agent
+                self.matching_agents[0] += 1
+            elif 1 + self.num_noise_agents <= message.matching_agent_id <= self.num_noise_agents + self.num_value_agents: #Matched by Value Agent
+                self.matching_agents[1] += 1
+            elif 1 + self.num_noise_agents + self.num_value_agents <= message.matching_agent_id <= self.num_noise_agents + self.num_value_agents + self.num_momentum_agents: #Matched by Momentum Agent
+                self.matching_agents[2] += 1
+            elif message.matching_agent_id == self.num_noise_agents + self.num_value_agents + self.num_momentum_agents + 2: #Matched by MM
+                self.matching_agents[3] += 1
+            elif message.matching_agent_id >= self.num_noise_agents + self.num_value_agents + self.num_momentum_agents + 3: #Matched by PT
+                self.matching_agents[message.matching_agent_id - self.num_noise_agents - \
+                    self.num_value_agents - self.num_momentum_agents + 1] += 1
+            else:
+                print(f'Order of {self.id} matched by unknown trader!!!!')
+            # print(self.matching_agents)
+        if isinstance(message, OrderMatchedValueAgentMsg):
+            t = int((current_time - str_to_ns(self.mkt_open))/self.wakeup_interval_generator.step_duration)
+            if t >= self.max_iter:
+                t = self.max_iter - 1
+            self.matched_value_agent_orders[0,t] = message.price
+            if message.side == "SELL":
+                self.matched_value_agent_orders[1,t] = 0
+            elif message.side == "BUY":
+                self.matched_value_agent_orders[1,t] = 2
+            
+        # elif isinstance(message, OrderAcceptedMsg):
+        #     self.order_accepted(message.order)
 
     def get_wake_frequency(self) -> NanosecondTime:
         # first wakeup interval from open
@@ -178,6 +228,8 @@ class CoreBackgroundAgent(TradingAgent):
         # print(actions)
         # TODO Add cancel in actions
         # print(actions)
+        # if self.id == 114:
+        #     print('applying actions of MM at: ',fmt_ts(self.current_time))
         for action in actions:
             if action["type"] == "MKT":
                 side = Side.BID if action["direction"] == "BUY" else Side.ASK
@@ -271,6 +323,9 @@ class CoreBackgroundAgent(TradingAgent):
             "mkt_open": mkt_open,
             "mkt_close": mkt_close,
         }
+        # if self.id == 114:
+        #     print('Getting internal data of MM with inter orders at: ',\
+        #         inter_wakeup_executed_orders,fmt_ts(self.current_time))
         return internal_data
 
     def order_executed(self, order: Order) -> None:
@@ -307,6 +362,8 @@ class CoreBackgroundAgent(TradingAgent):
                 "executed_qty": executed_qty,
                 "cancelled_qty": 0,
             }
+        # if self.id == 114:
+        #     print('Inter wakeup executed orders for MM at: ',self.inter_wakeup_executed_orders,fmt_ts(self.current_time))
 
     def order_accepted(self, order: Order) -> None:
         super().order_accepted(order)
