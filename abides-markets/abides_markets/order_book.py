@@ -18,6 +18,7 @@ from .messages.orderbook import (
     OrderModifiedMsg,
     OrderReplacedMsg,
 )
+from .messages.marl import OrderMatchedWithWhomMsg, OrderMatchedValueAgentMsg
 from .orders import LimitOrder, MarketOrder, Order, Side
 from .price_level import PriceLevel
 
@@ -318,7 +319,24 @@ class OrderBook:
                 matched_order.agent_id, OrderExecutedMsg(matched_order)
             )
             self.owner.send_message(order.agent_id, OrderExecutedMsg(filled_order))
-
+            ### | Kshama
+            mm_id = 26
+            value_ids = [21,22]
+            if order.agent_id >= mm_id:
+                self.owner.send_message(order.agent_id, OrderMatchedWithWhomMsg(matched_order.agent_id))
+                if order.agent_id == matched_order.agent_id:
+                    print(f'Agent {order.agent_id} matches its own orders!!!')
+                    print(order,matched_order)
+            if matched_order.agent_id >= mm_id:
+                self.owner.send_message(matched_order.agent_id, OrderMatchedWithWhomMsg(order.agent_id))
+            if matched_order.agent_id in value_ids:
+                side = "SELL" if matched_order.side.is_bid() else "BUY"
+                self.owner.send_message(mm_id, OrderMatchedValueAgentMsg(matched_order.fill_price,side))
+            if order.agent_id in value_ids:
+                side = "SELL" if order.side.is_bid() else "BUY"
+                self.owner.send_message(mm_id, OrderMatchedValueAgentMsg(order.fill_price,side))
+            #### Kshama |
+            
             if self.owner.book_logging == True:
                 # append current OB state to book_log2
                 self.append_book_log2()
