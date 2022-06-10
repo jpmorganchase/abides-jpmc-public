@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: abides-markets
+Version: 0.0.0
+Summary: ABIDES: Agent-Based Interactive Discrete Event Simulation environment
+Home-page: https://github.com/tuckerbalch/jpmc-abides
+License: UNKNOWN
+Description: # ABIDES-markets
+Platform: UNKNOWN
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown

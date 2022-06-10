@@ -52,14 +52,13 @@ d = args.delay_in_volume_reporting
 tune_flag = True if args.tune_flag else False
 a2c_flag = False
 timestep_duration = "60S"
-
 register_env(
     "marl-v0",
     lambda config: SubGymMultiAgentRLEnv_v0(**config),
 )
 ray.shutdown()
-ray.init()
-
+ray.init() 
+# #Causes IOError: [RayletClient] Unable to register worker with raylet. No such file or directory!
 if a2c_flag:
     name_xp = "a2c_"
 else:
@@ -94,7 +93,7 @@ if tune_flag:
     tune.run(
         "A2C" if a2c_flag else "PPO",
         name=name_xp,
-        resume=True,
+        resume=False,
         stop=stop,
         checkpoint_at_end=True,
         checkpoint_freq=20,

@@ -7,3 +7,6 @@ psutil==5.8.0
 ray[rllib]==1.7.0
 scipy==1.7.0
 tqdm==4.61.1
+tensorflow==2.8.0
+torch==1.11.0
+wandb==0.12.16

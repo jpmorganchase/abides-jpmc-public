@@ -21,7 +21,6 @@ from abides_markets.agents import (
 )
 from abides_markets.models import OrderSizeModel
 from abides_markets.oracles import SparseMeanRevertingOracle
-from abides_markets.oracles.background_v2.linear_oracle import LinearOracle, OracleParameters
 from abides_markets.utils import generate_latency_model
 
 
@@ -50,7 +49,6 @@ def build_config(
     kappa=1.67e-15,  # Value Agents appraisal of mean-reversion
     lambda_a=5.7e-12,  # ValueAgent arrival rate
     # oracle
-    linear_oracle=False,#If true, use a simple linear oracle
     kappa_oracle=1.67e-16,  # Mean-reversion of fundamental time series.
     sigma_s=0,
     fund_vol=5e-10,  # Volatility of fundamental time series.
@@ -72,8 +70,6 @@ def build_config(
     mm_cancel_limit_delay=50,  # 50 nanoseconds
     # 5) Momentum Agents
     num_momentum_agents=12,
-    momentum_agent_freq=None, # wake up frequency of momentum agents
-    mm_flag=True,
 ):
     """
     create the background configuration for rmsc04
@@ -124,34 +120,26 @@ def build_config(
     NOISE_MKT_CLOSE = DATE + str_to_ns("16:00:00")
 
     # oracle
-    if linear_oracle:
-        oracle_parameters = OracleParameters()
-        oracle_parameters.l_1 = 1000/(390) #to have $10 more from r_bar at end of trading day
-        oracle_parameters.sigma = sigma_s
-        symbols = {ticker: {"opening_price": r_bar}}
-        oracle = LinearOracle(MKT_OPEN, symbols, ticker, oracle_parameters, np.random.RandomState(
-                                        seed=np.random.randint(low=0, high=2 ** 32)))
-    else:
-        symbols = {
-            ticker: {
-                "r_bar": r_bar,
-                "kappa": kappa_oracle,
-                "sigma_s": sigma_s,
-                "fund_vol": fund_vol,
-                "megashock_lambda_a": megashock_lambda_a,
-                "megashock_mean": megashock_mean,
-                "megashock_var": megashock_var,
-                "random_state": np.random.RandomState(
-                    seed=np.random.randint(low=0, high=2 ** 32)
-                ),
-            }
+    symbols = {
+        ticker: {
+            "r_bar": r_bar,
+            "kappa": kappa_oracle,
+            "sigma_s": sigma_s,
+            "fund_vol": fund_vol,
+            "megashock_lambda_a": megashock_lambda_a,
+            "megashock_mean": megashock_mean,
+            "megashock_var": megashock_var,
+            "random_state": np.random.RandomState(
+                seed=np.random.randint(low=0, high=2 ** 32)
+            ),
         }
+    }
 
-        oracle = SparseMeanRevertingOracle(MKT_OPEN, NOISE_MKT_CLOSE, symbols)
+    oracle = SparseMeanRevertingOracle(MKT_OPEN, NOISE_MKT_CLOSE, symbols)
 
     # Agent configuration
     agent_count, agents, agent_types = 0, [], []
-    # print(f'in rmsc04: {exchange_log_orders}, {log_orders}')
+
     agents.extend(
         [
             ExchangeAgent(
@@ -175,7 +163,7 @@ def build_config(
     )
     agent_types.extend("ExchangeAgent")
     agent_count += 1
-    print(f'{linear_oracle}, {num_noise_agents}, {num_value_agents}, {num_momentum_agents}, {momentum_agent_freq}, {lambda_a}')
+
     agents.extend(
         [
             NoiseAgent(
@@ -221,37 +209,36 @@ def build_config(
     agent_count += num_value_agents
     agent_types.extend(["ValueAgent"])
 
-    if mm_flag:
-        agents.extend(
-            [
-                AdaptiveMarketMakerAgent(
-                    id=j,
-                    name="ADAPTIVE_POV_MARKET_MAKER_AGENT_{}".format(j),
-                    type="AdaptivePOVMarketMakerAgent",
-                    symbol=ticker,
-                    starting_cash=starting_cash,
-                    pov=MM_PARAMS[idx][1],
-                    min_order_size=MM_PARAMS[idx][4],
-                    window_size=MM_PARAMS[idx][0],
-                    num_ticks=MM_PARAMS[idx][2],
-                    wake_up_freq=MM_PARAMS[idx][3],
-                    poisson_arrival=True,
-                    cancel_limit_delay=mm_cancel_limit_delay,
-                    skew_beta=mm_skew_beta,
-                    price_skew_param=mm_price_skew,
-                    level_spacing=mm_level_spacing,
-                    spread_alpha=mm_spread_alpha,
-                    backstop_quantity=mm_backstop_quantity,
-                    log_orders=log_orders,
-                    random_state=np.random.RandomState(
-                        seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
-                    ),
-                )
-                for idx, j in enumerate(range(agent_count, agent_count + NUM_MM))
-            ]
-        )
-        agent_count += NUM_MM
-        agent_types.extend("POVMarketMakerAgent")
+    agents.extend(
+        [
+            AdaptiveMarketMakerAgent(
+                id=j,
+                name="ADAPTIVE_POV_MARKET_MAKER_AGENT_{}".format(j),
+                type="AdaptivePOVMarketMakerAgent",
+                symbol=ticker,
+                starting_cash=starting_cash,
+                pov=MM_PARAMS[idx][1],
+                min_order_size=MM_PARAMS[idx][4],
+                window_size=MM_PARAMS[idx][0],
+                num_ticks=MM_PARAMS[idx][2],
+                wake_up_freq=MM_PARAMS[idx][3],
+                poisson_arrival=True,
+                cancel_limit_delay=mm_cancel_limit_delay,
+                skew_beta=mm_skew_beta,
+                price_skew_param=mm_price_skew,
+                level_spacing=mm_level_spacing,
+                spread_alpha=mm_spread_alpha,
+                backstop_quantity=mm_backstop_quantity,
+                log_orders=log_orders,
+                random_state=np.random.RandomState(
+                    seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
+                ),
+            )
+            for idx, j in enumerate(range(agent_count, agent_count + NUM_MM))
+        ]
+    )
+    agent_count += NUM_MM
+    agent_types.extend("POVMarketMakerAgent")
 
     agents.extend(
         [
@@ -263,7 +250,7 @@ def build_config(
                 starting_cash=starting_cash,
                 min_size=1,
                 max_size=10,
-                wake_up_freq=str_to_ns(momentum_agent_freq),
+                wake_up_freq=str_to_ns("37s"),
                 poisson_arrival=True,
                 log_orders=log_orders,
                 order_size_model=ORDER_SIZE_MODEL,
