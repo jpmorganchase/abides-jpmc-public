@@ -25,7 +25,7 @@ parser.add_argument('-vp',
                     help='Whether to add volume info to PT state; 0: Dont add; 1: Add')
 parser.add_argument('-l',
                     '--quote_history',
-                    default=2,
+                    default=5,
                     type=int,
                     help='Length of history for state L: [t-L,...,t]')
 parser.add_argument('-d',
