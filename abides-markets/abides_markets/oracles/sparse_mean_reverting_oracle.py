@@ -131,7 +131,7 @@ class SparseMeanRevertingOracle(MeanRevertingOracle):
         # Extract the parameters for the OU process update.
         mu = s["r_bar"]
         gamma = s["kappa"]
-        theta = s["fund_vol"]  # the volatility value for the generated time-series. 
+        theta = s["fund_vol"]  # the volatility value for the generated time-series.
 
         # The OU process is able to skip any amount of time and sample the next desired value
         # from the appropriate distribution of possible values.

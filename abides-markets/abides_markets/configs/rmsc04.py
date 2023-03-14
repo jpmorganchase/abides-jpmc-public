@@ -29,7 +29,7 @@ from abides_markets.utils import generate_latency_model
 
 
 def build_config(
-    seed=int(datetime.now().timestamp() * 1_000_000) % (2 ** 32 - 1),
+    seed=int(datetime.now().timestamp() * 1_000_000) % (2**32 - 1),
     date="20210205",
     end_time="10:00:00",
     stdout_log_level="INFO",
@@ -130,7 +130,7 @@ def build_config(
             "megashock_mean": megashock_mean,
             "megashock_var": megashock_var,
             "random_state": np.random.RandomState(
-                seed=np.random.randint(low=0, high=2 ** 32)
+                seed=np.random.randint(low=0, high=2**32)
             ),
         }
     }
@@ -156,7 +156,7 @@ def build_config(
                 computation_delay=0,
                 stream_history=stream_history_length,
                 random_state=np.random.RandomState(
-                    seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
+                    seed=np.random.randint(low=0, high=2**32, dtype="uint64")
                 ),
             )
         ]
@@ -176,7 +176,7 @@ def build_config(
                 log_orders=log_orders,
                 order_size_model=ORDER_SIZE_MODEL,
                 random_state=np.random.RandomState(
-                    seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
+                    seed=np.random.randint(low=0, high=2**32, dtype="uint64")
                 ),
             )
             for j in range(agent_count, agent_count + num_noise_agents)
@@ -200,7 +200,7 @@ def build_config(
                 log_orders=log_orders,
                 order_size_model=ORDER_SIZE_MODEL,
                 random_state=np.random.RandomState(
-                    seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
+                    seed=np.random.randint(low=0, high=2**32, dtype="uint64")
                 ),
             )
             for j in range(agent_count, agent_count + num_value_agents)
@@ -231,7 +231,7 @@ def build_config(
                 backstop_quantity=mm_backstop_quantity,
                 log_orders=log_orders,
                 random_state=np.random.RandomState(
-                    seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
+                    seed=np.random.randint(low=0, high=2**32, dtype="uint64")
                 ),
             )
             for idx, j in enumerate(range(agent_count, agent_count + NUM_MM))
@@ -255,7 +255,7 @@ def build_config(
                 log_orders=log_orders,
                 order_size_model=ORDER_SIZE_MODEL,
                 random_state=np.random.RandomState(
-                    seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
+                    seed=np.random.randint(low=0, high=2**32, dtype="uint64")
                 ),
             )
             for j in range(agent_count, agent_count + num_momentum_agents)
@@ -266,7 +266,7 @@ def build_config(
 
     # extract kernel seed here to reproduce the state of random generator in old version
     random_state_kernel = np.random.RandomState(
-        seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
+        seed=np.random.randint(low=0, high=2**32, dtype="uint64")
     )
     # LATENCY
     latency_model = generate_latency_model(agent_count)
