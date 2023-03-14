@@ -58,7 +58,7 @@ def build_config(
     fund_r_bar=100_000,
     fund_kappa=1.67e-16,
     fund_sigma_s=0,
-    fund_vol=1e-8,
+    fund_vol=1e-3,  # Volatility of fundamental time series (std).
     fund_megashock_lambda_a=2.77778e-18,
     fund_megashock_mean=1000,
     fund_megashock_var=50_000,
