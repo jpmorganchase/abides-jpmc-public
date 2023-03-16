@@ -58,7 +58,7 @@ def build_config(
     fund_r_bar=100_000,
     fund_kappa=1.67e-16,
     fund_sigma_s=0,
-    fund_vol=1e-8,
+    fund_vol=1e-3,  # Volatility of fundamental time series (std).
     fund_megashock_lambda_a=2.77778e-18,
     fund_megashock_mean=1000,
     fund_megashock_var=50_000,
@@ -68,7 +68,6 @@ def build_config(
     val_vol=1e-8,
     val_lambda_a=7e-11,
 ):
-
     fund_sigma_n = fund_r_bar / 10
     val_sigma_n = val_r_bar / 10
     symbol = ticker
@@ -99,7 +98,7 @@ def build_config(
             "megashock_mean": fund_megashock_mean,
             "megashock_var": fund_megashock_var,
             "random_state": np.random.RandomState(
-                seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
+                seed=np.random.randint(low=0, high=2**32, dtype="uint64")
             ),
         }
     }
@@ -272,7 +271,7 @@ def build_config(
 
     # extract kernel seed here to reproduce the state of random generator in old version
     random_state_kernel = np.random.RandomState(
-        seed=np.random.randint(low=0, high=2 ** 32, dtype="uint64")
+        seed=np.random.randint(low=0, high=2**32, dtype="uint64")
     )
     # LATENCY
 
