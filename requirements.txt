@@ -5,5 +5,5 @@ pandas==1.2.4
 pomegranate==0.14.5
 psutil==5.8.0
 ray[rllib]==1.7.0
-scipy==1.7.0
+scipy==1.10.0
 tqdm==4.61.1
